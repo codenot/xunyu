@@ -1,0 +1,210 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.3.13",
+    "lastTouchedAt": "2026-03-21T06:26:12.552Z"
+  },
+  "wizard": {
+    "lastRunAt": "2026-03-21T05:24:34.518Z",
+    "lastRunVersion": "2026.3.13",
+    "lastRunCommand": "configure",
+    "lastRunMode": "local"
+  },
+  "models": {
+    "providers": {
+      "volcengine-plan": {
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
+        "apiKey": "c945c2eb-5295-4a75-8453-b29ab77f11bc",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "ark-code-latest",
+            "name": "ark-code-latest",
+            "input": [
+              "text",
+              "image"
+            ],
+            "contextWindow": 256000,
+            "maxTokens": 32000
+          },
+          {
+            "id": "doubao-seed-code",
+            "name": "doubao-seed-code",
+            "input": [
+              "text",
+              "image"
+            ],
+            "contextWindow": 256000,
+            "maxTokens": 32000
+          },
+          {
+            "id": "glm-4.7",
+            "name": "glm-4.7",
+            "input": [
+              "text"
+            ],
+            "contextWindow": 200000,
+            "maxTokens": 128000
+          },
+          {
+            "id": "deepseek-v3.2",
+            "name": "deepseek-v3.2",
+            "contextWindow": 128000,
+            "maxTokens": 32000
+          },
+          {
+            "id": "doubao-seed-2.0-code",
+            "name": "doubao-seed-2.0-code",
+            "input": [
+              "text",
+              "image"
+            ],
+            "contextWindow": 256000,
+            "maxTokens": 128000
+          },
+          {
+            "id": "doubao-seed-2.0-pro",
+            "name": "doubao-seed-2.0-pro",
+            "input": [
+              "text",
+              "image"
+            ],
+            "contextWindow": 256000,
+            "maxTokens": 128000
+          },
+          {
+            "id": "doubao-seed-2.0-lite",
+            "name": "doubao-seed-2.0-lite",
+            "input": [
+              "text",
+              "image"
+            ],
+            "contextWindow": 256000,
+            "maxTokens": 128000
+          },
+          {
+            "id": "minimax-m2.5",
+            "name": "minimax-m2.5",
+            "input": [
+              "text"
+            ],
+            "contextWindow": 200000,
+            "maxTokens": 128000
+          },
+          {
+            "id": "kimi-k2.5",
+            "name": "kimi-k2.5",
+            "input": [
+              "text",
+              "image"
+            ],
+            "contextWindow": 256000,
+            "maxTokens": 32000
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "volcengine-plan/doubao-seed-2.0-pro"
+      },
+      "models": {
+        "volcengine-plan/ark-code-latest": {},
+        "volcengine-plan/doubao-seed-code": {},
+        "volcengine-plan/glm-4.7": {},
+        "volcengine-plan/deepseek-v3.2": {},
+        "volcengine-plan/doubao-seed-2.0-code": {},
+        "volcengine-plan/doubao-seed-2.0-pro": {},
+        "volcengine-plan/doubao-seed-2.0-lite": {},
+        "volcengine-plan/minimax-m2.5": {},
+        "volcengine-plan/kimi-k2.5": {}
+      },
+      "workspace": "/home/ubuntu/.openclaw/workspace",
+      "compaction": {
+        "mode": "safeguard"
+      }
+    },
+    "list": [
+      {
+        "id": "coordinator",
+        "workspace": "/home/ubuntu/.openclaw/workspace-xunyu-coordinator",
+        "model": {
+          "primary": "volcengine-plan/doubao-seed-2.0-lite"
+        }
+      },
+      {
+        "id": "marker",
+        "workspace": "/home/ubuntu/.openclaw/workspace-xunyu-marker",
+        "model": {
+          "primary": "volcengine-plan/doubao-seed-2.0-pro"
+        }
+      },
+      {
+        "id": "inspector",
+        "workspace": "/home/ubuntu/.openclaw/workspace-xunyu-inspector",
+        "model": {
+          "primary": "volcengine-plan/deepseek-v3.2"
+        }
+      }
+    ]
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true,
+    "ownerDisplay": "raw"
+  },
+  "channels": {
+    "qqbot": {
+      "appId": "1903620759",
+      "clientSecret": "8fCkJsS2dEqS5jN2iO5nVEyiTF1ocQF5",
+      "agentId": "coordinator",
+      "asr": {
+        "enabled": false
+      },
+      "enabled": true
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "lan",
+    "controlUi": {
+      "allowedOrigins": [
+        "http://localhost:18789",
+        "http://127.0.0.1:18789"
+      ]
+    },
+    "auth": {
+      "mode": "token",
+      "token": "7b1aab70c1ed1d23bb1fe04c66828ad2408058f261d5d85e"
+    },
+    "tailscale": {
+      "mode": "off",
+      "resetOnExit": false
+    }
+  },
+  "plugins": {
+    "entries": {
+      "channels": {
+        "enabled": true
+      }
+    },
+    "installs": {
+      "channels": {
+        "source": "npm",
+        "spec": "@openclaw-china/channels",
+        "installPath": "/home/ubuntu/.openclaw/extensions/channels",
+        "version": "2026.3.20",
+        "resolvedName": "@openclaw-china/channels",
+        "resolvedVersion": "2026.3.20",
+        "resolvedSpec": "@openclaw-china/channels@2026.3.20",
+        "integrity": "sha512-5jGVAS7WwgoJjg+8X/URYpUmUQMpt3NAHB7wAsqHoCTicapryZZTOhxCs2DyEnVQRmJd1Zi3sWzx8WA0NrsQ/g==",
+        "shasum": "f0f07e5a9bbac775f95e2f2a45654f7cf1f57f70",
+        "resolvedAt": "2026-03-21T06:21:38.597Z",
+        "installedAt": "2026-03-21T06:22:14.887Z"
+      }
+    }
+  }
+}
