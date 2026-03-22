@@ -1,10 +1,48 @@
 import argparse
-import os
 import json
+import os
 from collections import defaultdict
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
+
+def iter_subject_results(data_dir, qq, student, subject, start="", end=""):
+    student_dir = os.path.join(os.fspath(data_dir), str(qq), student)
+    if not os.path.exists(student_dir):
+        return
+
+    for batch_id in sorted(os.listdir(student_dir)):
+        batch_dir = os.path.join(student_dir, batch_id)
+        if not os.path.isdir(batch_dir):
+            continue
+
+        fpath = os.path.join(batch_dir, f"result_{subject}.json")
+        if not os.path.exists(fpath):
+            continue
+
+        with open(fpath, "r", encoding="utf-8") as f:
+            try:
+                data = json.load(f)
+                ts = data.get("timestamp", "").split("T")[0]
+                if start and ts < start:
+                    continue
+                if end and ts > end:
+                    continue
+                yield data
+            except Exception:
+                pass
+
+def collect_top_weak_points(data_dir, qq, student, subject, start="", end="", limit=3):
+    wp_counts = defaultdict(int)
+    for result in iter_subject_results(data_dir, qq, student, subject, start=start, end=end):
+        for wp in result.get("weak_points", []):
+            wp_counts[wp] += 1
+
+    if not wp_counts:
+        return []
+
+    sorted_wp = sorted(wp_counts.items(), key=lambda x: x[1], reverse=True)
+    return [wp for wp, _ in sorted_wp[:limit]]
 
 def main():
     parser = argparse.ArgumentParser()
@@ -12,36 +50,29 @@ def main():
     parser.add_argument("--student", required=True)
     parser.add_argument("--subject", required=True)
     parser.add_argument("--count", type=int, default=5)
+    parser.add_argument("--start", default="")
+    parser.add_argument("--end", default="")
     args = parser.parse_args()
-    
+
     student_dir = os.path.join(DATA_DIR, str(args.qq), args.student)
     if not os.path.exists(student_dir):
         print("未找到该学生的历史记录，无法提取薄弱点。")
         return
-        
-    wp_counts = defaultdict(int)
-    for batch_id in os.listdir(student_dir):
-        batch_dir = os.path.join(student_dir, batch_id)
-        if not os.path.isdir(batch_dir): continue
-        
-        fname = f"result_{args.subject}.json"
-        fpath = os.path.join(batch_dir, fname)
-        if os.path.exists(fpath):
-            with open(fpath, "r", encoding="utf-8") as f:
-                try:
-                    data = json.load(f)
-                    for wp in data.get("weak_points", []):
-                        wp_counts[wp] += 1
-                except:
-                    pass
-                    
-    if not wp_counts:
+
+    top_wps = collect_top_weak_points(
+        DATA_DIR,
+        args.qq,
+        args.student,
+        args.subject,
+        start=args.start,
+        end=args.end,
+        limit=3,
+    )
+
+    if not top_wps:
         print(f"该学生在 {args.subject} 科目上暂无明显的薄弱点记录，您可以自由出题。")
         return
-        
-    sorted_wp = sorted(wp_counts.items(), key=lambda x: x[1], reverse=True)
-    top_wps = [k for k, v in sorted_wp[:3]]
-    
+
     print(f"以下是学生 {args.student} 最需要提升的 {args.subject} 核心薄弱点：")
     for wp in top_wps:
         print(f"- {wp}")
