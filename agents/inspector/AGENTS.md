@@ -42,18 +42,18 @@ Step 5: 直接回复 coordinator：
 ```
 
 ### 2. 学习巩固 工作流 (Study)
-Step 1: 根据 `purpose` 选择对应的上游分析方式，确保使用同一组 `subject` / `start` / `end` 过滤条件：
-- `mistakes`：调用错题总结数据脚本，获取报告级的错题与薄弱点信息
+Step 1: 所有 `study` 请求都必须先获取统一的历史上下文，且统一使用同一组 `subject` / `start` / `end` 过滤条件：
 ```bash
 python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_report.py --qq {qq} --student {student} --type mistakes --subject {subject} --start '{start}' --end '{end}'
 ```
-- `exercises`：调用题目生成依据脚本，获取同类练习所需的核心薄弱点
+- `mistakes`：仅使用上述共享历史上下文，生成错题总结与解析。
+- `exercises`：在共享历史上下文可用后，再调用题目生成依据脚本，获取同类练习所需的核心薄弱点：
 ```bash
 python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_exercises.py --qq {qq} --student {student} --subject {subject} --start '{start}' --end '{end}' --count {count}
 ```
-- `both`：先调用 `generate_report.py --type mistakes` 获取错题总结与解析所需的上下文，再调用 `generate_exercises.py --subject {subject} --start '{start}' --end '{end}' --count {count}` 获取同类练习所需的上下文；两者使用同一组 `subject` / `start` / `end` 过滤条件，最后合并为一个文档，输出错题总结与同类练习
-Step 2: 检查上游脚本返回结果。
-- 如果 `generate_report.py` 在请求时间范围内返回报错、无记录或空结果，则不要生成学习巩固文档，直接回复 coordinator：
+- `both`：在共享历史上下文可用后，也要调用 `generate_exercises.py --subject {subject} --start '{start}' --end '{end}' --count {count}` 获取同类练习所需的上下文；最后将错题总结与同类练习合并为一个文档。
+Step 2: 先检查共享历史上下文的返回结果，这个检查对 `mistakes` / `exercises` / `both` 三种 purpose 都生效。
+- 如果 `generate_report.py --type mistakes` 在请求时间范围内返回报错、无记录或空结果，则不要生成任何学习巩固文档，直接回复 coordinator：
 ```json
 {
   "status": "study_empty",
@@ -61,7 +61,7 @@ Step 2: 检查上游脚本返回结果。
   "word_path": ""
 }
 ```
-- 其余情况下，仔细分析上游脚本返回的"核心薄弱点"信息。
+- 只有共享历史上下文可用时，`exercises` 和 `both` 才继续调用 `generate_exercises.py`；随后再综合分析上游脚本返回的"核心薄弱点"信息。
 Step 3: 按 `purpose` 生成对应内容：
 - `mistakes`：输出错题总结与解析
 - `exercises`：输出同类巩固练习
