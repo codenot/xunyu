@@ -42,11 +42,17 @@ Step 5: 直接回复 coordinator：
 ```
 
 ### 2. 学习巩固 工作流 (Study)
-Step 1: 根据 `purpose` 调用辅助分析脚本，获取该学生的核心薄弱点或题目生成依据：
+Step 1: 根据 `purpose` 选择对应的上游分析方式，确保使用同一组 `subject` / `start` / `end` 过滤条件：
+- `mistakes`：调用错题总结数据脚本，获取报告级的错题与薄弱点信息
+```bash
+python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_report.py --qq {qq} --student {student} --type mistakes --subject {subject} --start '{start}' --end '{end}'
+```
+- `exercises`：调用题目生成依据脚本，获取同类练习所需的核心薄弱点
 ```bash
 python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_exercises.py --qq {qq} --student {student} --subject {subject} --start '{start}' --end '{end}' --count X
 ```
-Step 2: 仔细分析脚本返回的"核心薄弱点"信息。
+- `both`：先调用 `generate_report.py --type mistakes` 获取错题总结与解析所需的上下文，再调用 `generate_exercises.py` 获取同类练习所需的上下文；两者使用同一组 `subject` / `start` / `end` 过滤条件，最后合并为一个文档，输出错题总结与同类练习
+Step 2: 仔细分析上游脚本返回的"核心薄弱点"信息。
 Step 3: 按 `purpose` 生成对应内容：
 - `mistakes`：输出错题总结与解析
 - `exercises`：输出同类巩固练习
