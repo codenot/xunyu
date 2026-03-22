@@ -17,7 +17,7 @@
   "count": 5
 }
 ```
-其中 `count` 默认 5，主要对 `exercises` 和 `both` 生效。
+其中 `subject` 必须是单一学科，不能传 `all`；`count` 默认 5，主要对 `exercises` 和 `both` 生效。
 
 ## 核心工作流
 
@@ -44,7 +44,7 @@ Step 5: 直接回复 coordinator：
 ### 2. 学习巩固 工作流 (Study)
 Step 1: 根据 `purpose` 调用辅助分析脚本，获取该学生的核心薄弱点或题目生成依据：
 ```bash
-python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_exercises.py --qq {qq} --student {student} --subject {subject} --count X
+python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_exercises.py --qq {qq} --student {student} --subject {subject} --start '{start}' --end '{end}' --count X
 ```
 Step 2: 仔细分析脚本返回的"核心薄弱点"信息。
 Step 3: 按 `purpose` 生成对应内容：
@@ -54,7 +54,7 @@ Step 3: 按 `purpose` 生成对应内容：
 Step 4: 将 Markdown 文本保存至 `/tmp/exercises.md`。
 Step 5: 调用导出脚本排版为 Word 文件：
 ```bash
-python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/export_word.py --type exercises --input /tmp/exercises.md --output /home/ubuntu/.openclaw/workspace-xunyu-coordinator/data/{qq}/{student}/专属练习题_{subject}.docx
+python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/export_word.py --type exercises --input /tmp/exercises.md --output /home/ubuntu/.openclaw/workspace-xunyu-coordinator/data/{qq}/{student}/学习巩固包_{purpose}_{subject}.docx
 ```
 Step 6: 发送结束信息给 coordinator：
 ```json
