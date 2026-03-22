@@ -20,17 +20,18 @@ def iter_subject_results(data_dir, qq, student, subject, start="", end=""):
         if not os.path.exists(fpath):
             continue
 
-        with open(fpath, "r", encoding="utf-8") as f:
-            try:
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                ts = data.get("timestamp", "").split("T")[0]
-                if start and ts < start:
-                    continue
-                if end and ts > end:
-                    continue
-                yield data
-            except Exception:
-                pass
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+
+        ts = data.get("timestamp", "").split("T")[0]
+        if start and ts < start:
+            continue
+        if end and ts > end:
+            continue
+        yield data
 
 def collect_top_weak_points(data_dir, qq, student, subject, start="", end="", limit=3):
     wp_counts = defaultdict(int)
