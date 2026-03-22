@@ -12,7 +12,7 @@
 ## 快速部署
 1. 克隆仓库并进入目录。
    ```bash
-   git clone <repo-url>
+   git clone git@github.com:codenot/xunyu.git
    cd xunyu
    ```
 2. 执行安装脚本。
@@ -24,15 +24,20 @@
    ```bash
    openclaw gateway restart
    ```
+5. 注意：`install.sh` 里的 OpenClaw 目录是硬编码的 `/home/ubuntu/.openclaw`，部署前请确保你的 OpenClaw 实际使用这个路径，或者先修改脚本再部署。
 
 ## 网关配置要点
 - `channels.qqbot.agentId` 必须指向 `coordinator`。
 - `agents.list` 必须注册三个 Agent：`coordinator`、`marker`、`inspector`。
 - 网关使用前，请确认 `/home/ubuntu/.openclaw/openclaw.json` 已包含仓库中的 Agent 配置。
+- `coordinator`、`marker`、`inspector` 的 `workspace` 必须分别指向 `install.sh` 创建的软链接路径：
+  - `/home/ubuntu/.openclaw/workspace-xunyu-coordinator`
+  - `/home/ubuntu/.openclaw/workspace-xunyu-marker`
+  - `/home/ubuntu/.openclaw/workspace-xunyu-inspector`
 - 依赖由 `requirements.txt` 提供，当前包含 `python-docx`、`reportlab`、`Pillow`。
 
 ## 启动与联调
-启动完成后，向绑定的 QQ 账号发送“帮我批改作业”进行联调。若配置和网关都正常，`coordinator` 会进入收集流程并继续引导后续批改。
+启动完成后，向绑定的 QQ 账号发送“帮我批改作业”进行联调。若配置和网关都正常，`coordinator` 应先返回收集/登记引导，再继续进入孩子或批次收集流程。
 
 ## 目录结构
 仓库部署时，重点关注以下本地目录：
