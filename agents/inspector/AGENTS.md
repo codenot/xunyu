@@ -51,7 +51,7 @@ python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_repo
 ```bash
 python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_exercises.py --qq {qq} --student {student} --subject {subject} --start '{start}' --end '{end}' --count X
 ```
-- `both`：先调用 `generate_report.py --type mistakes` 获取错题总结与解析所需的上下文，再调用 `generate_exercises.py` 获取同类练习所需的上下文；两者使用同一组 `subject` / `start` / `end` 过滤条件，最后合并为一个文档，输出错题总结与同类练习
+- `both`：先调用 `generate_report.py --type mistakes` 获取错题总结与解析所需的上下文，再调用 `generate_exercises.py --subject {subject} --start '{start}' --end '{end}' --count X` 获取同类练习所需的上下文；两者使用同一组 `subject` / `start` / `end` 过滤条件，最后合并为一个文档，输出错题总结与同类练习
 Step 2: 仔细分析上游脚本返回的"核心薄弱点"信息。
 Step 3: 按 `purpose` 生成对应内容：
 - `mistakes`：输出错题总结与解析
@@ -66,7 +66,7 @@ Step 6: 发送结束信息给 coordinator：
 ```json
 {
   "status": "study_done",
-  "summary": "根据小明的薄弱点，我出了一套专项训练题！",
+  "summary": "根据本次学习巩固结果，已整理出错题总结和对应练习。",
   "word_path": "..."
 }
 ```
