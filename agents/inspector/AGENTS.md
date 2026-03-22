@@ -66,7 +66,7 @@ Step 6: 发送结束信息给 coordinator：
 ```json
 {
   "status": "study_done",
-  "summary": "根据本次学习巩固结果，已整理出错题总结和对应练习。",
+  "summary": "本次学习巩固内容已整理完成。",
   "word_path": "..."
 }
 ```
