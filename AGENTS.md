@@ -13,6 +13,7 @@
 - 修改 `openclaw.json` 或 Agent 指令文件后，使用 `openclaw gateway restart` 重启网关。
 
 ## 代码风格与命名规范
+- 所有生成的文档尽量使用中文，生成的代码在需要理解的地方增加注释
 - Python 统一使用 4 空格缩进，函数、变量、CLI 子命令采用 `snake_case`，模块级常量采用全大写。
 - 新增逻辑优先放在 `scripts/`，用 `argparse` 暴露参数，保持单一职责。
 - 输出文件沿用现有命名：`result_<subject>.json`、`analysis_<subject>.md`、`report_<subject>.pdf`。
@@ -27,3 +28,5 @@
 - 提交信息遵循 Conventional Commits，当前历史已使用 `feat: ...`；后续保持 `feat:`、`fix:`、`docs:` 这类前缀。
 - PR 描述应写清影响的 Agent 或脚本、验证命令，以及是否改动 `openclaw.json`、依赖或文档。
 - 涉及报告导出或提示词变更时，附上示例输出或截图；不要提交密钥、真实学生数据或临时批次文件。
+
+## 
