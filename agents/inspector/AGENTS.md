@@ -49,18 +49,27 @@ python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_repo
 ```
 - `exercises`：调用题目生成依据脚本，获取同类练习所需的核心薄弱点
 ```bash
-python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_exercises.py --qq {qq} --student {student} --subject {subject} --start '{start}' --end '{end}' --count X
+python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_exercises.py --qq {qq} --student {student} --subject {subject} --start '{start}' --end '{end}' --count {count}
 ```
-- `both`：先调用 `generate_report.py --type mistakes` 获取错题总结与解析所需的上下文，再调用 `generate_exercises.py --subject {subject} --start '{start}' --end '{end}' --count X` 获取同类练习所需的上下文；两者使用同一组 `subject` / `start` / `end` 过滤条件，最后合并为一个文档，输出错题总结与同类练习
-Step 2: 仔细分析上游脚本返回的"核心薄弱点"信息。
+- `both`：先调用 `generate_report.py --type mistakes` 获取错题总结与解析所需的上下文，再调用 `generate_exercises.py --subject {subject} --start '{start}' --end '{end}' --count {count}` 获取同类练习所需的上下文；两者使用同一组 `subject` / `start` / `end` 过滤条件，最后合并为一个文档，输出错题总结与同类练习
+Step 2: 检查上游脚本返回结果。
+- 如果 `generate_report.py` 在请求时间范围内返回报错、无记录或空结果，则不要生成学习巩固文档，直接回复 coordinator：
+```json
+{
+  "status": "study_empty",
+  "summary": "所选时间范围内暂无可用于学习巩固的学习记录，未生成文档。",
+  "word_path": ""
+}
+```
+- 其余情况下，仔细分析上游脚本返回的"核心薄弱点"信息。
 Step 3: 按 `purpose` 生成对应内容：
 - `mistakes`：输出错题总结与解析
 - `exercises`：输出同类巩固练习
-- `both`：先输出错题总结，再输出同类巩固练习，最后统一输出答案与解析
+- `both`：先输出错题总结，再输出同类巩固练习，最后统一输出答案与解析；如果 `generate_exercises.py` 没有返回明显薄弱点，仍然要生成合并文档，并基于 `generate_report.py --type mistakes` 提供的高频错因组织练习部分，不能自由发挥成无关题目
 Step 4: 将 Markdown 文本保存至 `/tmp/exercises.md`。
 Step 5: 调用导出脚本排版为 Word 文件：
 ```bash
-python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/export_word.py --type exercises --input /tmp/exercises.md --output /home/ubuntu/.openclaw/workspace-xunyu-coordinator/data/{qq}/{student}/学习巩固包_{purpose}_{subject}.docx
+python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/export_word.py --type exercises --input /tmp/exercises.md --output /home/ubuntu/.openclaw/workspace-xunyu-coordinator/data/{qq}/{student}/学习巩固包_{purpose}_{subject}_{start}_{end}.docx
 ```
 Step 6: 发送结束信息给 coordinator：
 ```json
