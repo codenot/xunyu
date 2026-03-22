@@ -27,10 +27,10 @@ Step 1: 处理请求，调用数据生成脚本，直接将返回作为上下文
 python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_report.py --qq {qq} --student {student} --type {weekly/monthly} --subject {subject} --start '{start}' --end '{end}'
 ```
 Step 2: 读取脚本生成的统计 JSON（含平均分、最常犯错误、薄弱方向），严格遵循 SKILL.md 定义好的格式要求生成 Markdown 文本结构（# 综合评价... ## 各科等）。
-Step 3: 将生成的 Markdown 文本保存至本地临时文件 `/tmp/report.md`。
+Step 3: 生成唯一临时文件名（如 `/tmp/report_{qq}_{student}_{timestamp}.md`，timestamp 用 `date +%s%N` 或 Python `time.time_ns()` 生成），将 Markdown 文本保存至该文件，后续步骤引用同一变量。
 Step 4: 调用导出脚本将文本编排成带排版的 Word (.docx)：
 ```bash
-python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/export_word.py --type report --input /tmp/report.md --output /home/ubuntu/.openclaw/workspace-xunyu-coordinator/data/{qq}/{student}/报告_{type}.docx
+python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/export_word.py --type report --input {tmp_report_path} --output /home/ubuntu/.openclaw/workspace-xunyu-coordinator/data/{qq}/{student}/报告_{type}.docx
 ```
 Step 5: 直接回复 coordinator：
 ```json
@@ -66,10 +66,10 @@ Step 3: 按 `purpose` 生成对应内容：
 - `mistakes`：输出错题总结与解析
 - `exercises`：输出同类巩固练习
 - `both`：先输出错题总结，再输出同类巩固练习，最后统一输出答案与解析；如果 `generate_exercises.py` 没有返回明显薄弱点，仍然要生成合并文档，并基于 `generate_report.py --type mistakes` 提供的高频错因组织练习部分，不能自由发挥成无关题目
-Step 4: 将 Markdown 文本保存至 `/tmp/exercises.md`。
+Step 4: 生成唯一临时文件名（如 `/tmp/exercises_{qq}_{student}_{timestamp}.md`，timestamp 同上），将 Markdown 文本保存至该文件，后续步骤引用同一变量。
 Step 5: 调用导出脚本排版为 Word 文件：
 ```bash
-python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/export_word.py --type exercises --input /tmp/exercises.md --output /home/ubuntu/.openclaw/workspace-xunyu-coordinator/data/{qq}/{student}/学习巩固包_{purpose}_{subject}_{start}_{end}.docx
+python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/export_word.py --type exercises --input {tmp_exercises_path} --output /home/ubuntu/.openclaw/workspace-xunyu-coordinator/data/{qq}/{student}/学习巩固包_{purpose}_{subject}_{start}_{end}.docx
 ```
 Step 6: 发送结束信息给 coordinator：
 ```json
