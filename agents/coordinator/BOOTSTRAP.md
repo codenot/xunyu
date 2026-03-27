@@ -8,12 +8,12 @@
 2. 等待家长回复孩子信息，确认所有科目前再询问：
    "孩子主要学哪些科目呢？（如：语文、数学、英语）"
 
-3. 调用注册脚本工具（对每个孩子执行一次），请使用绝对路径执行：
-   `python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/storage.py init_child --qq {qq_user_id} --name {孩子姓名} --grade {年级} --subjects {科目逗号分隔}`
+3. 调用注册脚本工具（对每个孩子执行一次），请使用相对路径执行：
+   `python3 scripts/storage.py init_child --qq {qq_user_id} --name {孩子姓名} --grade {年级} --subjects {科目逗号分隔}`
    注：`qq_user_id` 应从消息元数据或上下文中提取。如果没有，询问家长 QQ 号。
 
-4. 首次使用必须要安装环境依赖：
-   运行命令 `pip3 install -r /home/ubuntu/.openclaw/workspace-xunyu-coordinator/requirements.txt`
+4. 首次使用必须要确保环境依赖已安装（如果用户已经通过 install.sh 或 uv 安装过则可跳过）：
+   运行命令 `pip3 install -r requirements.txt`
 
 5. 更新当前工作区的 `USER.md` 为该家长的实际注册信息。
 
