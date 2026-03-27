@@ -1,13 +1,29 @@
+"""export_report.py — 将批改报告（Markdown 文本）生成漂亮的 PDF。
+
+用法：
+    python3 scripts/export_report.py \
+        --qq <qq> --student <student> --batch <batch_id> --subject <subject> \
+        --text 'Markdown 文本内容'
+
+输出文件：data/<qq>/<student>/<batch>/report_<subject>.pdf
+"""
+
 import os
-import json
 import argparse
+import datetime
 import urllib.request
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+# 自动安装所需的依赖（如果缺少）
+try:
+    import markdown
+    from xhtml2pdf import pisa
+except ImportError:
+    import subprocess
+    import sys
+    print("Installing required packages (markdown, xhtml2pdf)...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "markdown", "xhtml2pdf"])
+    import markdown
+    from xhtml2pdf import pisa
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -15,116 +31,126 @@ FONT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "NotoSansSC
 FONT_URL = "https://github.com/google/fonts/raw/main/ofl/notosanssc/NotoSansSC-Regular.ttf"
 
 def ensure_font():
+    """确保中文字体可用，若不存在则尝试下载。"""
     if not os.path.exists(FONT_PATH):
-        print("Downloading Chinese font (NotoSansSC) for PDF generation...")
+        print("Downloading NotoSansSC font for PDF generation…")
         try:
             urllib.request.urlretrieve(FONT_URL, FONT_PATH)
         except Exception as e:
-            print(f"Warning: Failed to download font: {e}")
-            pass
-    
-    if os.path.exists(FONT_PATH):
-        pdfmetrics.registerFont(TTFont('NotoSans', FONT_PATH))
-    else:
-        # Fallback to default, might not render Chinese
-        print("Warning: NotoSans font not available, using Helvetica.")
+            print(f"Warning: font download failed — {e}")
+    return FONT_PATH if os.path.exists(FONT_PATH) else ""
 
-def build_pdf(json_data, output_path):
-    ensure_font()
-    font_name = 'NotoSans' if os.path.exists(FONT_PATH) else 'Helvetica'
+def build_pdf(md_text: str, student: str, subject: str, batch_id: str, output_path: str, title: str = ""):
+    """将 Markdown 评语渲染为 A4 PDF。"""
+    font_path = ensure_font()
     
-    doc = SimpleDocTemplate(output_path, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
+    # 默认使用科目+批改报告作为标题，除非指定了自定义标题
+    display_title = title if title else f"{subject} 批改报告"
     
-    styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name='TitleChinese', fontName=font_name, fontSize=18, alignment=1, spaceAfter=20))
-    styles.add(ParagraphStyle(name='Heading2Chinese', fontName=font_name, fontSize=14, spaceAfter=10, spaceBefore=10))
-    styles.add(ParagraphStyle(name='NormalChinese', fontName=font_name, fontSize=11, spaceAfter=6))
+    # 将 Windows 路径里的反斜杠转为正斜杠，防止 CSS 解析错误
+    font_path_css = font_path.replace("\\", "/")
     
-    elements = []
+    # 转换 Markdown 到 HTML
+    # extensions 开启表格、列表等加强支持
+    html_body = markdown.markdown(md_text, extensions=['tables', 'fenced_code', 'nl2br'])
     
-    student = json_data.get("student", "学生")
-    subject = json_data.get("subject", "学科")
-    batch_id = json_data.get("batch_id", "")
-    date_str = json_data.get("timestamp", "").split("T")[0] if "timestamp" in json_data else "Unknown"
+    date_str = datetime.date.today().isoformat()
     
-    elements.append(Paragraph(f"批改报告 - {subject}", styles['TitleChinese']))
-    elements.append(Paragraph(f"学生: {student}    |    日期: {date_str}    |    批次: {batch_id}", styles['NormalChinese']))
-    elements.append(Spacer(1, 10))
+    # 构造完整的带有样式的 HTML
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            @font-face {{
+                font-family: 'NotoSansSC';
+                src: url('{font_path_css}');
+            }}
+            body {{
+                font-family: 'NotoSansSC', sans-serif;
+                line-height: 1.6;
+                color: #333;
+                font-size: 14px;
+            }}
+            .header-meta {{
+                text-align: center;
+                color: #666;
+                font-size: 12px;
+                margin-bottom: 20px;
+                border-bottom: 1px solid #ccc;
+                padding-bottom: 10px;
+            }}
+            h1 {{ font-size: 26px; color: #2c3e50; text-align: center; margin-bottom: 5px; }}
+            h2 {{ font-size: 20px; color: #2980b9; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-top: 15px; }}
+            h3 {{ font-size: 16px; color: #34495e; }}
+            p {{ margin-bottom: 10px; }}
+            img {{ max-width: 100%; height: auto; margin: 10px 0; }}
+            ul, ol {{ margin-bottom: 12px; margin-left: 20px; }}
+            table {{ border-collapse: collapse; width: 100%; margin-bottom: 15px; font-size: 12px; }}
+            td, th {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+            th {{ background-color: #f8f9fa; color: #2c3e50; font-weight: bold; }}
+            blockquote {{
+                border-left: 4px solid #3498db;
+                padding-left: 10px;
+                margin-left: 0;
+                color: #555;
+                background-color: #fbfcfd;
+            }}
+            strong {{ color: #e74c3c; }}
+        </style>
+    </head>
+    <body>
+        <h1>{display_title}</h1>
+        <div class="header-meta">
+            学生：{student} &nbsp;|&nbsp; 批次：{batch_id} &nbsp;|&nbsp; 日期：{date_str}
+        </div>
+        <div class="content">
+            {html_body}
+        </div>
+    </body>
+    </html>
+    """
     
-    score = json_data.get("score", 0)
-    total = json_data.get("total", 100)
-    elements.append(Paragraph(f"<b>得分：{score} / {total}</b>", styles['NormalChinese']))
-    elements.append(Paragraph(f"总体评价：{json_data.get('overall', '')}", styles['NormalChinese']))
-    elements.append(Spacer(1, 10))
+    # 使用 xhtml2pdf 写入 PDF
+    with open(output_path, "wb") as pdf_file:
+        pisa_status = pisa.CreatePDF(
+            src=html_content,
+            dest=pdf_file,
+            encoding='utf-8'
+        )
     
-    wp = json_data.get("weak_points", [])
-    if wp:
-        elements.append(Paragraph("<b>薄弱知识点：</b>", styles['NormalChinese']))
-        elements.append(Paragraph("、".join(wp), styles['NormalChinese']))
-        elements.append(Spacer(1, 10))
-        
-    corrections = json_data.get("corrections", [])
-    if corrections:
-        elements.append(Paragraph("<b>错题明细：</b>", styles['Heading2Chinese']))
-        
-        table_data = [["题号", "学生答案", "正确答案", "错误类型", "思路提示"]]
-        for c in corrections:
-            if not c.get("is_correct", True):
-                table_data.append([
-                    Paragraph(str(c.get("question", "")), styles['NormalChinese']),
-                    Paragraph(str(c.get("student_answer", "")), styles['NormalChinese']),
-                    Paragraph(str(c.get("correct_answer", "")), styles['NormalChinese']),
-                    Paragraph(str(c.get("error_type", "")), styles['NormalChinese']),
-                    Paragraph(str(c.get("thinking_guide", "")), styles['NormalChinese'])
-                ])
-                
-        if len(table_data) > 1:
-            t = Table(table_data, colWidths=[50, 80, 80, 80, 240])
-            t.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
-                ('TEXTCOLOR', (0,0), (-1,0), colors.black),
-                ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-                ('VALIGN', (0,0), (-1,-1), 'TOP'),
-                ('FONTNAME', (0,0), (-1,-1), font_name),
-                ('FONTSIZE', (0,0), (-1,-1), 10),
-                ('BOTTOMPADDING', (0,0), (-1,0), 12),
-                ('BACKGROUND', (0,1), (-1,-1), colors.white),
-                ('GRID', (0,0), (-1,-1), 1, colors.black),
-            ]))
-            elements.append(t)
-        else:
-            elements.append(Paragraph("全部正确！", styles['NormalChinese']))
-            
-    sugg = json_data.get("exercise_suggestions", [])
-    if sugg:
-        elements.append(Spacer(1, 15))
-        elements.append(Paragraph("<b>下一步建议：</b>", styles['Heading2Chinese']))
-        for s in sugg:
-            elements.append(Paragraph(f"• {s}", styles['NormalChinese']))
-            
-    doc.build(elements)
-    print(f"PDF generated: {output_path}")
+    if pisa_status.err:
+        print(f"Error generating PDF: {pisa_status.err}")
+    else:
+        print(f"report saved: {output_path}")
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--qq", required=True)
-    parser.add_argument("--student", required=True)
-    parser.add_argument("--batch", required=True)
-    parser.add_argument("--subject", required=True)
+    parser = argparse.ArgumentParser(description="生成报告 PDF")
+    parser.add_argument("--qq", required=True, help="QQ 用户 ID")
+    parser.add_argument("--student", required=True, help="学生姓名")
+    parser.add_argument("--batch", required=True, help="批次 ID")
+    parser.add_argument("--subject", required=True, help="科目（数学/语文/英语）")
+    parser.add_argument("--text", required=True, help="正文内容（Markdown 文本）")
+    parser.add_argument("--title", help="PDF 顶部显示的标题")
+
     args = parser.parse_args()
-    
+
+    # 尝试将传递过来的文本中的换行符从 \\n 替换为真实的 \n
+    text = args.text.replace("\\n", "\n")
+
     batch_dir = os.path.join(DATA_DIR, str(args.qq), args.student, args.batch)
-    json_path = os.path.join(batch_dir, f"result_{args.subject}.json")
-    
-    if not os.path.exists(json_path):
-        print(f"Error: {json_path} not found.")
-        return
-        
-    with open(json_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-        
-    pdf_path = os.path.join(batch_dir, f"report_{args.subject}.pdf")
-    build_pdf(data, pdf_path)
+    os.makedirs(batch_dir, exist_ok=True)
+
+    output_path = os.path.join(batch_dir, f"report_{args.subject}.pdf")
+    build_pdf(
+        md_text=text,
+        student=args.student,
+        subject=args.subject,
+        batch_id=args.batch,
+        output_path=output_path,
+        title=args.title
+    )
 
 if __name__ == "__main__":
     main()

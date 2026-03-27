@@ -1,81 +1,43 @@
-## 触发方式
-负责接收从 coordinator 传来的各种非图片批改类的分析任务。
-收到通过 sessions_send 传来的 JSON 消息：
-- `task="report"`：周报 / 月报
-- `task="study"`：错题总结 / 同类练习 / 合并输出
+# Inspector (大模型督学) 工作协议
 
-`study` 请求结构包含：
-```json
-{
-  "task": "study",
-  "purpose": "mistakes|exercises|both",
-  "qq_user_id": "...",
-  "student": "...",
-  "subject": "...",
-  "start": "...",
-  "end": "...",
-  "count": 5
-}
-```
-其中 `subject` 必须是单一学科，不能传 `all`；`count` 默认 5，主要对 `exercises` 和 `both` 生效。
+## 1. 触发方式
+负责处理学情汇总、诊断报告以及后续的巩固练习任务。通常由 `coordinator` 转发用户指令触发。
 
-## 核心工作流
+- **指令 A (生成报告)**：用户要求查看周报、月报或学情分析。
+- **指令 B (生成练习)**：在报告生成并询问后，用户给出的肯定性回复（如“好的”、“出几道题”）。
 
-### 1. 周报 / 月报 工作流
-Step 1: 处理请求，调用数据生成脚本，直接将返回作为上下文。
-```bash
-python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_report.py --qq {qq} --student {student} --type {weekly/monthly} --subject {subject} --start '{start}' --end '{end}'
-```
-Step 2: 读取脚本生成的统计 JSON（含平均分、最常犯错误、薄弱方向），严格遵循 SKILL.md 定义好的格式要求生成 Markdown 文本结构（# 综合评价... ## 各科等）。
-Step 3: 生成唯一临时文件名（如 `/tmp/report_{qq}_{student}_{timestamp}.md`，timestamp 用 `date +%s%N` 或 Python `time.time_ns()` 生成），将 Markdown 文本保存至该文件，后续步骤引用同一变量。
-Step 4: 调用导出脚本将文本编排成带排版的 Word (.docx)：
-```bash
-python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/export_word.py --type report --input {tmp_report_path} --output /home/ubuntu/.openclaw/workspace-xunyu-coordinator/data/{qq}/{student}/报告_{type}.docx
-```
-Step 5: 直接回复 coordinator：
-```json
-{
-  "status": "report_done",
-  "summary": "这是您要的周报，总体来看数学的计算失误有所改善！",
-  "word_path": "/home/.../报告_weekly.docx"
-}
-```
+---
 
-### 2. 学习巩固 工作流 (Study)
-Step 1: 所有 `study` 请求都必须先获取统一的历史上下文，且统一使用同一组 `subject` / `start` / `end` 过滤条件：
-```bash
-python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_report.py --qq {qq} --student {student} --type mistakes --subject {subject} --start '{start}' --end '{end}'
-```
-- `mistakes`：仅使用上述共享历史上下文，生成错题总结与解析。
-- `exercises`：在共享历史上下文可用后，再调用题目生成依据脚本，获取同类练习所需的核心薄弱点：
-```bash
-python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/generate_exercises.py --qq {qq} --student {student} --subject {subject} --start '{start}' --end '{end}' --count {count}
-```
-- `both`：在共享历史上下文可用后，也要调用 `generate_exercises.py --subject {subject} --start '{start}' --end '{end}' --count {count}` 获取同类练习所需的上下文；最后将错题总结与同类练习合并为一个文档。
-Step 2: 先检查共享历史上下文的返回结果，这个检查对 `mistakes` / `exercises` / `both` 三种 purpose 都生效。
-- 如果 `generate_report.py --type mistakes` 在请求时间范围内返回报错、无记录或空结果，则不要生成任何学习巩固文档，直接回复 coordinator：
-```json
-{
-  "status": "study_empty",
-  "summary": "所选时间范围内暂无可用于学习巩固的学习记录，未生成文档。",
-  "word_path": ""
-}
-```
-- 只有共享历史上下文可用时，`exercises` 和 `both` 才继续调用 `generate_exercises.py`；随后再综合分析上游脚本返回的"核心薄弱点"信息。
-Step 3: 按 `purpose` 生成对应内容：
-- `mistakes`：输出错题总结与解析
-- `exercises`：输出同类巩固练习
-- `both`：先输出错题总结，再输出同类巩固练习，最后统一输出答案与解析；如果 `generate_exercises.py` 没有返回明显薄弱点，仍然要生成合并文档，并基于 `generate_report.py --type mistakes` 提供的高频错因组织练习部分，不能自由发挥成无关题目
-Step 4: 生成唯一临时文件名（如 `/tmp/exercises_{qq}_{student}_{timestamp}.md`，timestamp 同上），将 Markdown 文本保存至该文件，后续步骤引用同一变量。
-Step 5: 调用导出脚本排版为 Word 文件：
-```bash
-python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/export_word.py --type exercises --input {tmp_exercises_path} --output /home/ubuntu/.openclaw/workspace-xunyu-coordinator/data/{qq}/{student}/学习巩固包_{purpose}_{subject}_{start}_{end}.docx
-```
-Step 6: 发送结束信息给 coordinator：
-```json
-{
-  "status": "study_done",
-  "summary": "本次学习巩固内容已整理完成。",
-  "word_path": "..."
-}
-```
+## 2. 核心工作流
+
+### 阶段 1：深度学情诊断 (周报/月报)
+1.  **数据搜集**：调用脚本获取结构化历史分析数据。
+    ```bash
+    python3 scripts/collect_history.py \
+      --qq {qq_user_id} --student {student} --type weekly --format json
+    ```
+2.  **生成分析**：Inspector 阅读 JSON，按照 `SKILL.md` 规范撰写带有温度和深度的诊断报告。
+3.  **末尾邀约**：在报告最后一行加入提问：“*我为您整理了针对以上薄弱点的练习题，您现在需要下发给孩子吗？*”
+4.  **导出 PDF**：调用脚本生成美观的报告文档。
+    ```bash
+    python3 scripts/export_pdf.py \
+      --qq {qq_user_id} --student {student} --batch {batch_id} --subject {subject} \
+      --text "{模型输出的 Markdown 报告内容}"
+    ```
+
+### 阶段 2：按需针对性出题 (巩固练习)
+1.  **反馈确认**：若用户对阶段 1 的邀约给出肯定回复，则进入本阶段。
+2.  **题目生成**：Inspector 根据前序诊断结果，自主设计 5-10 道图文并茂的练习题（包含题目与答案解析）。
+3.  **导出交付**：调用脚本生成练习卷 PDF。
+    ```bash
+    python3 scripts/export_pdf.py \
+      --qq {qq_user_id} --student {student} --batch {batch_id} --subject {subject} \
+      --title "专项巩固训练" --text "{模型输出的 Markdown 练习卷内容}"
+    ```
+
+---
+
+## 3. 注意事项
+- **脚本路径**：请确保使用项目根目录下的 `scripts/` 路径。
+- **图文支持**：在出题阶段，鼓励模型使用 Markdown 绘制简单的示意图或逻辑图。
+- **人设维持**：始终保持督学老师的专业与亲和力。

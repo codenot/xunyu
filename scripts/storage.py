@@ -75,133 +75,42 @@ def init_batch(args):
     print(original_dir)
 
 def save_result(args):
+    """将批改结果写入 analysis_{subject}.json。
+
+    接收的 JSON 只需包含：
+      - weak_points: [str]   薄弱知识点列表
+      - errors: [object]     错题列表（全对时传空数组）
+
+    函数会自动附加 batch_id / qq_user_id / student / subject / timestamp 字段。
+    """
     batch_dir = os.path.join(get_user_dir(args.qq), args.student, args.batch)
     os.makedirs(batch_dir, exist_ok=True)
-    
+
     try:
-        result_data = json.loads(args.json)
+        analysis = json.loads(args.json)
     except json.JSONDecodeError as e:
-        print(f"Error decoding JSON: {e}")
+        print(f"Error: JSON 解析失败 — {e}")
         return
 
-    # Add metadata
-    result_data["batch_id"] = args.batch
-    result_data["qq_user_id"] = args.qq
-    result_data["student"] = args.student
-    result_data["subject"] = args.subject
-    
-    if "timestamp" not in result_data:
-        result_data["timestamp"] = datetime.datetime.now().isoformat()
+    # 校验必要字段
+    if "weak_points" not in analysis or "errors" not in analysis:
+        print("Error: JSON 必须包含 'weak_points' 和 'errors' 字段")
+        return
 
-    # Save result_{subject}.json
-    json_path = os.path.join(batch_dir, f"result_{args.subject}.json")
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(result_data, f, ensure_ascii=False, indent=2)
-        
-    # Generate and save analysis_{subject}.md
-    analysis_path = os.path.join(batch_dir, f"analysis_{args.subject}.md")
-    generate_analysis_md(result_data, analysis_path)
-    
-    # Generate and append to summary.txt
-    summary_path = os.path.join(batch_dir, "summary.txt")
-    generate_summary_txt(result_data, summary_path)
-    
-    print(f"Results saved to {batch_dir}")
+    # 注入元数据
+    analysis["batch_id"] = args.batch
+    analysis["qq_user_id"] = str(args.qq)
+    analysis["student"] = args.student
+    analysis["subject"] = args.subject
+    if "timestamp" not in analysis:
+        analysis["timestamp"] = datetime.datetime.now().isoformat()
 
-def generate_analysis_md(data, output_path):
-    student = data.get("student", "")
-    subject = data.get("subject", "")
-    batch_id = data.get("batch_id", "")
-    
-    # Try to extract date from timestamp (format: 2026-03-22T14:30:00)
-    date_str = batch_id.split('_')[0] if batch_id else "未知日期"
-    if "timestamp" in data:
-        try:
-            date_str = data["timestamp"].split("T")[0]
-        except:
-            pass
+    # 写入 analysis_{subject}.json
+    out_path = os.path.join(batch_dir, f"analysis_{args.subject}.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(analysis, f, ensure_ascii=False, indent=2)
 
-    score = data.get("score", 0)
-    total = data.get("total", 100)
-    corr_list = data.get("corrections", [])
-    
-    md_lines = []
-    md_lines.append(f"# 批次分析 | {student} | {subject} | {date_str}")
-    md_lines.append("")
-    md_lines.append("## 得分")
-    md_lines.append(f"{score}/{total}")
-    md_lines.append("")
-    md_lines.append("## 错误记录")
-    
-    # Aggregate errors
-    error_stats = defaultdict(lambda: {"count": 0, "reasons": set()})
-    for corr in corr_list:
-        if not corr.get("is_correct", True):
-            etype = corr.get("error_type", "未知错误")
-            ereason = corr.get("error_reason", "无详细原因")
-            error_stats[etype]["count"] += 1
-            error_stats[etype]["reasons"].add(ereason)
-            
-    if error_stats:
-        md_lines.append("| 错误类型 | 错误原因示例 | 出现次数 |")
-        md_lines.append("|---------|---------|--------|")
-        for etype, stats in error_stats.items():
-            reasons_str = "；".join(list(stats["reasons"])[:2]) # max 2 examples
-            md_lines.append(f"| {etype} | {reasons_str} | {stats['count']} |")
-    else:
-        md_lines.append("全部正确，无错误记录。")
-        
-    md_lines.append("")
-    md_lines.append("## 薄弱知识点")
-    weak_points = data.get("weak_points", [])
-    if weak_points:
-        for wp in weak_points:
-            md_lines.append(f"- {wp}")
-    else:
-        md_lines.append("- 无明显薄弱点")
-        
-    md_lines.append("")
-    md_lines.append("## 出题建议")
-    suggestions = data.get("exercise_suggestions", [])
-    if suggestions:
-        for sug in suggestions:
-            md_lines.append(f"- {sug}")
-    else:
-        md_lines.append("- 根据薄弱点针对性出题。")
-        
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(md_lines) + "\n")
-
-def generate_summary_txt(data, output_path):
-    student = data.get("student", "")
-    subject = data.get("subject", "")
-    batch_id = data.get("batch_id", "")
-    timestamp = data.get("timestamp", "").replace("T", " ")[:16]
-    score = data.get("score", 0)
-    total = data.get("total", 100)
-    
-    error_types = defaultdict(int)
-    for corr in data.get("corrections", []):
-        if not corr.get("is_correct", True):
-            error_types[corr.get("error_type", "未知")] += 1
-            
-    # sort by count descending
-    sorted_errors = sorted(error_types.items(), key=lambda x: x[1], reverse=True)
-    top_errors_str = "、".join([f"{k}×{v}" for k, v in sorted_errors[:3]])
-    if not top_errors_str:
-        top_errors_str = "无"
-        
-    weak_str = "、".join(data.get("weak_points", [])) if data.get("weak_points") else "无"
-    
-    summary_line = f"批次：{batch_id} | {student} | {subject}\n"
-    summary_line += f"时间：{timestamp} | 得分：{score}/{total}\n"
-    summary_line += f"主要错误：{top_errors_str}\n"
-    summary_line += f"薄弱点：{weak_str}\n"
-    summary_line += f"总评：{data.get('overall', '')}\n\n"
-    
-    # Append to summary.txt to support multi-subject appending
-    with open(output_path, "a", encoding="utf-8") as f:
-        f.write(summary_line)
+    print(f"analysis saved: {out_path}")
 
 def query_score(args):
     # Print recent N scores
@@ -214,29 +123,30 @@ def query_score(args):
     # Batch dirs
     for batch_id in sorted(os.listdir(student_dir), reverse=True):
         batch_dir = os.path.join(student_dir, batch_id)
-        if not os.path.isdir(batch_dir): continue
-        
-        # files like result_{subj}.json
+        if not os.path.isdir(batch_dir):
+            continue
+
+        # 读 analysis_{subj}.json（新格式）
         for fname in os.listdir(batch_dir):
-            if fname.startswith("result_") and fname.endswith(".json"):
+            if fname.startswith("analysis_") and fname.endswith(".json"):
                 if args.subject and args.subject != "all":
-                    subj_in_fname = fname[7:-5]
+                    subj_in_fname = fname[9:-5]  # "analysis_".len == 9
                     if subj_in_fname != args.subject:
                         continue
-                
+
                 with open(os.path.join(batch_dir, fname), "r", encoding="utf-8") as f:
                     try:
                         data = json.load(f)
                         results.append({
                             "batch_id": batch_id,
                             "subject": data.get("subject"),
-                            "score": f"{data.get('score', 0)}/{data.get('total', 100)}",
+                            "weak_points": data.get("weak_points", []),
+                            "error_count": len(data.get("errors", [])),
                             "timestamp": data.get("timestamp"),
-                            "overall": data.get("overall")
                         })
-                    except:
+                    except Exception:
                         pass
-        
+
         if args.limit and len(results) >= args.limit:
             results = results[:args.limit]
             break
@@ -253,26 +163,27 @@ def get_results(args):
     results = []
     for batch_id in sorted(os.listdir(student_dir), reverse=True):
         batch_dir = os.path.join(student_dir, batch_id)
-        if not os.path.isdir(batch_dir): continue
-        
+        if not os.path.isdir(batch_dir):
+            continue
+
         for fname in os.listdir(batch_dir):
-            if fname.startswith("result_") and fname.endswith(".json"):
+            if fname.startswith("analysis_") and fname.endswith(".json"):
                 if args.subject and args.subject != "all":
-                    subj_in_fname = fname[7:-5]
+                    subj_in_fname = fname[9:-5]
                     if subj_in_fname != args.subject:
                         continue
-                        
+
                 with open(os.path.join(batch_dir, fname), "r", encoding="utf-8") as f:
                     try:
                         data = json.load(f)
-                        # Filter by start/end
+                        # 按日期过滤
                         ts = data.get("timestamp", "").split("T")[0]
                         if args.start and ts < args.start:
                             continue
                         if args.end and ts > args.end:
                             continue
                         results.append(data)
-                    except:
+                    except Exception:
                         pass
                         
     print(json.dumps(results, ensure_ascii=False, indent=2))
