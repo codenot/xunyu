@@ -15,8 +15,8 @@ Step 3. 按识别出的科目将图片分组：
 Step 4. 若有"待确认"图片：
   立即中断批改，通过 sessions_send 回传消息给 coordinator，让家长处理（当前暂可跳过待确认的图片）。
 Step 5. 对**每个有图片的科目组**分别独立批改：
-  - 根据该科目的批改标准（详见 SKILL.md）仔细逐题分析图片内容。
-  - **第一步**：充分利用 Markdown 格式，输出一份极度详尽的分析报告（包含错因复盘与详细推导），结尾输出 `---REPORT_END---`。
+  - 根据该科目的批改标准（详见 SKILL.md）仔细逐题分析图片内容。若能解析到页码则按页码顺序展示；若无页码则按图片分组，指明题目所属图片，并将同一张图上的题目聚拢分析。
+  - **第一步**：充分利用 Markdown 格式，输出一份极度详尽的分析报告（包含错因复盘与详细推导）。
   - **第二步**：基于上一阶段详细推导，归纳错题特征，执行 save_result 脚本保存结构化精简 analysis JSON：
     ```bash
     python3 /home/ubuntu/.openclaw/workspace-xunyu-coordinator/scripts/storage.py save_result \
