@@ -11,34 +11,32 @@
 import os
 import argparse
 import datetime
-import urllib.request
+import logging
 
 # 自动安装所需的依赖（如果缺少）
 try:
     import markdown
-    from xhtml2pdf import pisa
+    import weasyprint
 except ImportError:
     import subprocess
     import sys
-    print("Installing required packages (markdown, xhtml2pdf)...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "markdown", "xhtml2pdf"])
+    print("Installing required packages (markdown, weasyprint)...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "markdown", "weasyprint"])
     import markdown
-    from xhtml2pdf import pisa
+    import weasyprint
+
+# 屏蔽 weasyprint 过多的排版警告日志
+logging.getLogger('weasyprint').setLevel(logging.ERROR)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 FONT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "NotoSansSC-Regular.ttf")
-FONT_URL = "https://github.com/google/fonts/raw/main/ofl/notosanssc/NotoSansSC-Regular.ttf"
 
 def ensure_font():
-    """确保中文字体可用，若不存在则尝试下载。"""
+    """确保中文字体可用。"""
     if not os.path.exists(FONT_PATH):
-        print("Downloading NotoSansSC font for PDF generation…")
-        try:
-            urllib.request.urlretrieve(FONT_URL, FONT_PATH)
-        except Exception as e:
-            print(f"Warning: font download failed — {e}")
-    return FONT_PATH if os.path.exists(FONT_PATH) else ""
+        print(f"Warning: Local font missing at {FONT_PATH}")
+    return FONT_PATH
 
 def build_pdf(md_text: str, student: str, subject: str, batch_id: str, output_path: str, title: str = ""):
     """将 Markdown 评语渲染为 A4 PDF。"""
@@ -49,6 +47,9 @@ def build_pdf(md_text: str, student: str, subject: str, batch_id: str, output_pa
     
     # 将 Windows 路径里的反斜杠转为正斜杠，防止 CSS 解析错误
     font_path_css = font_path.replace("\\", "/")
+    if not font_path_css.startswith('/'):
+        font_path_css = '/' + font_path_css
+    font_path_uri = f"file://{font_path_css}"
     
     # 转换 Markdown 到 HTML
     # extensions 开启表格、列表等加强支持
@@ -65,7 +66,21 @@ def build_pdf(md_text: str, student: str, subject: str, batch_id: str, output_pa
         <style>
             @font-face {{
                 font-family: 'NotoSansSC';
-                src: url('{font_path_css}');
+                src: url('{font_path_uri}');
+            }}
+            @page {{
+                size: A4;
+                margin: 20mm;
+                @bottom-right {{
+                    content: counter(page) " / " counter(pages);
+                    font-size: 10px;
+                    color: #999;
+                }}
+                @top-center {{
+                    content: string(doctitle);
+                    font-size: 10px;
+                    color: #999;
+                }}
             }}
             body {{
                 font-family: 'NotoSansSC', sans-serif;
@@ -81,21 +96,38 @@ def build_pdf(md_text: str, student: str, subject: str, batch_id: str, output_pa
                 border-bottom: 1px solid #ccc;
                 padding-bottom: 10px;
             }}
-            h1 {{ font-size: 26px; color: #2c3e50; text-align: center; margin-bottom: 5px; }}
+            h1 {{ font-size: 26px; color: #2c3e50; text-align: center; margin-bottom: 5px; string-set: doctitle content(); }}
             h2 {{ font-size: 20px; color: #2980b9; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-top: 15px; }}
             h3 {{ font-size: 16px; color: #34495e; }}
             p {{ margin-bottom: 10px; }}
-            img {{ max-width: 100%; height: auto; margin: 10px 0; }}
+            img {{ max-width: 100%; height: auto; margin: 10px 0; page-break-inside: avoid; }}
             ul, ol {{ margin-bottom: 12px; margin-left: 20px; }}
-            table {{ border-collapse: collapse; width: 100%; margin-bottom: 15px; font-size: 12px; }}
+            table {{ page-break-inside: auto; border-collapse: collapse; width: 100%; margin-bottom: 15px; font-size: 12px; }}
+            tr {{ page-break-inside: avoid; page-break-after: auto; }}
+            thead {{ display: table-header-group; }}
             td, th {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
             th {{ background-color: #f8f9fa; color: #2c3e50; font-weight: bold; }}
+            pre {{
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                background-color: #f4f4f4;
+                padding: 10px;
+                border-radius: 4px;
+                page-break-inside: avoid;
+            }}
+            code {{
+                font-family: Consolas, monospace;
+                background-color: #f4f4f4;
+                padding: 2px 4px;
+                border-radius: 4px;
+            }}
             blockquote {{
                 border-left: 4px solid #3498db;
                 padding-left: 10px;
                 margin-left: 0;
                 color: #555;
                 background-color: #fbfcfd;
+                page-break-inside: avoid;
             }}
             strong {{ color: #e74c3c; }}
         </style>
@@ -112,18 +144,12 @@ def build_pdf(md_text: str, student: str, subject: str, batch_id: str, output_pa
     </html>
     """
     
-    # 使用 xhtml2pdf 写入 PDF
-    with open(output_path, "wb") as pdf_file:
-        pisa_status = pisa.CreatePDF(
-            src=html_content,
-            dest=pdf_file,
-            encoding='utf-8'
-        )
-    
-    if pisa_status.err:
-        print(f"Error generating PDF: {pisa_status.err}")
-    else:
+    # 使用 weasyprint 写入 PDF
+    try:
+        weasyprint.HTML(string=html_content).write_pdf(output_path)
         print(f"report saved: {output_path}")
+    except Exception as e:
+        print(f"Error generating PDF: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="生成报告 PDF")
