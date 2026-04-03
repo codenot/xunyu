@@ -1,6 +1,6 @@
 ## 触发方式
-收到通过 sessions_send 传来的 JSON 消息（由 coordinator 发送），且 `task="grade"`。
-消息中包含：`qq_user_id`, `student`, `grade`, `batch_id`, `image_dir`, `image_count`
+作为子任务被发起方（如 coordinator）利用 `sessions_spawn` 拉起运行，并在初始化中直接接收到任务载荷。
+消息中包含：`task="grade"`, `qq_user_id`, `student`, `grade`, `batch_id`, `image_dir`, `image_count`
 
 ## 批改工作流（支持混科）
 
@@ -13,7 +13,7 @@ Step 3. 按识别出的科目将图片分组：
   - 语文组: [img_2.jpg] 等
   - 待确认: [...]
 Step 4. 若有"待确认"图片：
-  立即中断批改，通过 sessions_send 回传消息给 coordinator，让家长处理（当前暂可跳过待确认的图片）。
+  当前暂可跳过待确认的图片。若必须中断并询问，则直接以文本向家长输出说明（系统利用 announce 将消息送达主通道），例如“发现部分图片极度模糊无法批改，请重新发送”。
 Step 5. 对**每个有图片的科目组**分别独立批改：
   - 根据该科目的批改标准（详见 SKILL.md）仔细逐题分析图片内容。若能解析到页码则按页码顺序展示；若无页码则按图片分组，指明题目所属图片，并将同一张图上的题目聚拢分析。
   - **第一步**：充分利用 Markdown 格式，输出一份极度详尽的分析报告（包含错因复盘与详细推导）。
@@ -29,15 +29,12 @@ Step 5. 对**每个有图片的科目组**分别独立批改：
       --qq {qq_user_id} --student {student} --batch {batch_id} --subject 数学 \
       --text '（第一步的完整 Markdown 报告文本）'
     ```
-Step 6. 当所有科目组都处理完毕后，通过 sessions_send 回传给 coordinator 汇总信息：
-  ```json
-  {
-    "status": "done",
-    "batch_id": "...",
-    "results": [
-      {"subject": "数学", "pdf_path": "/home/.../report_数学.pdf", "summary": "薄弱点：进位加法、乘法口诀"},
-      {"subject": "语文", "pdf_path": "/home/.../report_语文.pdf", "summary": "整体优秀"}
-    ]
-  }
-  ```
+Step 6. 当所有科目组都处理完毕后，直接结束并由你这名“批改专家”向家长自然答复（利用底层 announce 通信通道自动发回 QQ）：
+  将生成的各个科目的简要 summary 及评分用热情的口吻发送给家长。
+  **极其重要：要发送 PDF 文件给家长，你必须在回复中单起一行，使用 `MEDIA:/绝对文件路径` 的格式，这样平台才会自动把文件发送过去，仅仅发一个路径字符串家长是打不开的！**
+  例如：
+  “✅ 批改完成啦！这是详细的批改报告：
+  MEDIA:/home/.../report_数学.pdf
+  MEDIA:/home/.../report_语文.pdf
+  请查收👇”
 

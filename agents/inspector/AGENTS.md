@@ -18,22 +18,24 @@
     ```
 2.  **生成分析**：Inspector 阅读 JSON，按照 `SKILL.md` 规范撰写带有温度和深度的诊断报告。
 3.  **末尾邀约**：在报告最后一行加入提问：“*我为您整理了针对以上薄弱点的练习题，您现在需要下发给孩子吗？*”
-4.  **导出 PDF**：调用脚本生成美观的报告文档。
+4.  **导出并发送 PDF**：调用脚本生成美观的报告文档。
     ```bash
     python3 scripts/export_pdf.py \
       --qq {qq_user_id} --student {student} --batch {batch_id} --subject {subject} \
       --text "{模型输出的 Markdown 报告内容}"
     ```
+    **注意：** 生成文件后，在最终的答复文本中请单起一行写上 `MEDIA:/绝对路径`，以便系统能真正将 PDF 文件推送给家长。
 
 ### 阶段 2：按需针对性出题 (巩固练习)
 1.  **反馈确认**：若用户对阶段 1 的邀约给出肯定回复，则进入本阶段。
 2.  **题目生成**：Inspector 根据前序诊断结果，自主设计 5-10 道图文并茂的练习题（包含题目与答案解析）。
-3.  **导出交付**：调用脚本生成练习卷 PDF。
+3.  **导出并交付**：调用脚本生成练习卷 PDF。
     ```bash
     python3 scripts/export_pdf.py \
       --qq {qq_user_id} --student {student} --batch {batch_id} --subject {subject} \
       --title "专项巩固训练" --text "{模型输出的 Markdown 练习卷内容}"
     ```
+    **注意：** 文件生成后，请在输出总结的末尾换行，给出如 `MEDIA:/生成的绝对路径.pdf`，以此完成文件的实际下发。
 
 ---
 

@@ -17,9 +17,9 @@
 │  │  模型：doubao-seed-2.0-lite           │
 │  │  workspace: workspace-xunyu-coordinator   │
 │  │  职责：意图识别、多孩子管理             │
-│  │         sessions_send 委托其他 Agent   │
+│  │         sessions_spawn 委托后台 Agent   │
 │  └──────────────┬───────────────────────┘       │
-│                 │ sessions_send                  │
+│                 │ sessions_spawn                 │
 │          ┌──────┴───────┐                       │
 │          ↓              ↓                       │
 │  ┌───────────────┐  ┌───────────────┐           │
@@ -156,15 +156,15 @@ xunyu/                             ← Git 仓库根目录（本项目）
 
 ---
 
-## 四、Agent 间通信（sessions_send）
+## 四、Agent 间通信（sessions_spawn）
 
-coordinator 通过 **`sessions_send` 工具**将任务发给其他 Agent，在 AGENTS.md 中描述如下：
+coordinator 通过 **`sessions_spawn` 工具**将任务分配给独立的后台沙盒执行，在 AGENTS.md 中描述如下：
 
 ```
 ### 委托 marker 批改图片
 1. 收到图片 + 确认孩子姓名、科目
 2. 生成 batch_id，初始化批次目录（调 storage.py）
-3. 使用 sessions_send 工具，发送给 agentId: "marker"：
+3. 使用 sessions_spawn 工具，拉起 agentId: "marker"的子任务：
    {
      "task": "grade",
      "qq_user_id": "{qq_user_id}",
@@ -174,11 +174,11 @@ coordinator 通过 **`sessions_send` 工具**将任务发给其他 Agent，在 A
      "batch_id": "{batch_id}",
      "image_path": "{保存到批次目录的图片路径}"
    }
-4. 等待 marker 回传结果（batch_id + PDF路径 + 摘要文字）
-5. 将摘要文字 + PDF 文件发送给家长
+4. 告诉家长正在批改中，coordinator 服务结束。
+5. marker 在后台沙盒批改完后，通过 announce（子系统底层自然回流管道）自动把摘要和 PDF 返回给家长。
 
 ### 委托 inspector 生成报告
-使用 sessions_send 工具，发送给 agentId: "inspector"：
+使用 sessions_spawn 工具，拉起 agentId: "inspector"子任务：
 {
   "task": "report",
   "qq_user_id": "{qq_user_id}",
@@ -188,15 +188,14 @@ coordinator 通过 **`sessions_send` 工具**将任务发给其他 Agent，在 A
   "start": "{YYYY-MM-DD}",
   "end": "{YYYY-MM-DD}"
 }
-等待 inspector 回传 Word 文件路径，发给家长。
+等待期间 coordinator 无需操心，inspector 后台完成后自动通过 announce 推 Word 文件和总结给家长。
 ```
 
 **完整批改通信流程**：
 ```
 家长 → QQ → coordinator
-coordinator: 意图=批改 → sessions_send → marker
-marker: 看图 → 存结果 → 生成PDF → sessions_send 回传 → coordinator
-coordinator: 发摘要文字 + PDF → 家长
+coordinator: 意图=批改 → sessions_spawn → marker子任务
+marker: 看图 → 存结果 → 生成PDF → 发挥批改专家人设，利用 announce 回复报告 → 家长
 ```
 
 ---
@@ -260,10 +259,10 @@ coordinator: 发摘要文字 + PDF → 家长
 | "发完了"/"好了"/"批吧"/"完成" | 截止信号 | → 触发批改 |
 | 收集模式外发图片 | 普通对话 | → 正常回复，不触发批改 |
 | "多少分"/"成绩"/"上次" | 查成绩 | → storage.py query_score（带学科过滤）|
-| "周报"/"本周" | 生成周报 | → sessions_send → inspector（带学科过滤）|
-| "月报"/"本月" | 生成月报 | → sessions_send → inspector（带学科过滤）|
-| "错题"/"薄弱" | 错题本 | → sessions_send → inspector（带学科过滤）|
-| "出题"/"练习题" | 出题 | → sessions_send → inspector（带学科过滤）|
+| "周报"/"本周" | 生成周报 | → sessions_spawn → inspector（带学科过滤）|
+| "月报"/"本月" | 生成月报 | → sessions_spawn → inspector（带学科过滤）|
+| "错题"/"薄弱" | 错题本 | → sessions_spawn → inspector（带学科过滤）|
+| "出题"/"练习题" | 出题 | → sessions_spawn → inspector（带学科过滤）|
 
 ## 学科过滤规则
 
@@ -323,7 +322,7 @@ Step 3. 回复用户：
 Step 1. 检查 image_count，若为 0 → 回复"还没收到图片，请先发作业图片"
 Step 2. 回复用户：
   "收到！共{n}张，开始批改（自动识别科目），请稍等片刻⏳"
-Step 3. sessions_send → marker：
+Step 3. sessions_spawn → marker：
   {
     "task": "grade",
     "qq_user_id": "{qq}",
@@ -334,8 +333,7 @@ Step 3. sessions_send → marker：
     "image_count": {n}
     // 注：无 subject 字段，由 marker 自动识别
   }
-Step 4. 清除 collecting_mode 状态
-Step 5. 等待 marker 回传结果列表，按科目分别发给家长
+Step 4. 清除 collecting_mode 状态（无需等回传，marker 会走 announce 自动答复）
 
 ### 超时处理
 
@@ -407,7 +405,7 @@ QQ：{qq_user_id}
 
 ```markdown
 ## 触发方式
-收到 sessions_send 来的 JSON 消息，task="grade"
+被 coordinator 利用 sessions_spawn 拉起执行后台任务，并收到 JSON 参数：
 消息字段：qq_user_id / student / grade / batch_id / image_dir / image_count
 **注：无 subject 字段，需自动识别每张图的科目**
 
@@ -421,9 +419,9 @@ Step 3. 按识别出的科目将图片分组：
   数学组: [img_1.jpg, img_3.jpg]
   语文组: [img_2.jpg]
   待确认: [img_4.jpg]
-Step 4. 若有"待确认"图片 → sessions_send 回 coordinator：
+Step 4. 若有"待确认"图片 → 直接告知家长有问题即可：
   {"status": "need_confirm", "uncertain_images": ["img_4.jpg 无法识别科目，请告知"]}
-  coordinator 询问家长后再 sessions_send 回来补充科目信息
+  （通过 announce 直接传达给家长，建议其重新发送）
 Step 5. 对**每个科目组**独立批改：
   5a. 按批改标准逐题分析（见 SKILL.md）
   5b. 生成该科目的 result_{科目}.json
@@ -433,15 +431,13 @@ Step 5. 对**每个科目组**独立批改：
       python3 .../storage.py save_result \
         --qq {qq} --student {name} --batch {bid} \
         --subject {科目} --json '{结果JSON}'
-Step 6. 所有科目批改完成后，sessions_send 回传 coordinator：
-  {
-    "status": "done",
-    "batch_id": "...",
-    "results": [
-      {"subject": "数学", "score": "85/100", "pdf_path": "...", "summary": "..."},
-      {"subject": "语文", "score": "92/100", "pdf_path": "...", "summary": "..."}
-    ]
-  }
+Step 6. 所有科目批改完成后，作为批改专家直接向家长通告结果（系统自带 announce 回传）：
+  你会在结果输出中直接用人话描述并利用 `MEDIA:` 前缀发送 PDF：
+  例如："批改完成！这是报告与简评... 
+    数学: 85/100
+    MEDIA:/home/.../report_数学.pdf 
+    语文: 92/100
+    MEDIA:/home/.../report_语文.pdf"
 
 
 ## 批改标准
@@ -497,7 +493,7 @@ Step 6. 所有科目批改完成后，sessions_send 回传 coordinator：
 
 ```markdown
 ## 触发方式
-收到 sessions_send 来的 JSON 消息，task="report"
+被 coordinator 利用 sessions_spawn 拉起，接收 task="report"
 
 ## 时间范围计算
 - weekly：本周一 00:00 ~ 今天
@@ -510,12 +506,11 @@ Step 2. python3 ...generate_report.py \
          --qq {qq} --student {name} --type {type} \
          --subject {subj} --start {start} --end {end}
          → 返回汇总JSON + Word文件路径
-Step 3. sessions_send 回传给 coordinator：
-        {"word_path": "...", "summary": "本周批改X次，平均XX分..."}
+Step 3. 直接答复并向家长发 Word：
+        转述总结内容，并单起一行使用 `MEDIA:/绝对路径` 发送 word_path，以便底层推给家长。
 
 ## 无数据时
-sessions_send 回传：{"error": "该时间段内暂无批改记录"}
-coordinator 向家长说明。
+通过自己的渠道回复家长："该时间段内暂无批改/错题记录"。
 
 ## 练习题流程（task="exercises"）
 Step 1. python3 ...generate_exercises.py \

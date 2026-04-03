@@ -41,7 +41,7 @@
 为每个 Agent 创建独立的 workspace，并编写其元数据文件。
 - **Coordinator Agent** (`/coordinator/`):
   - [NEW] `IDENTITY.md` & `SOUL.md`: 设定人设。
-  - [NEW] `AGENTS.md`: 实现批次收集模式交互逻辑、使用 `sessions_send` 将任务传递给 marker 和 inspector。
+  - [NEW] `AGENTS.md`: 实现批次收集模式交互逻辑、使用 `sessions_spawn` 将任务拉起为后台子 Agent (marker 和 inspector)。
   - [NEW] `BOOTSTRAP.md` / `USER.md`: 包含首次启动时的登记及依赖环境的自动安装命令(`pip install`)。
   - [NEW] `skills/coordinator/SKILL.md`: 意图识别的补充说明。
 - **Marker Agent** (`/marker/`):

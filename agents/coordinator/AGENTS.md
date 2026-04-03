@@ -10,14 +10,14 @@
 |------|------|------|
 | "帮我批作业"/"开始批改"/"批一下" | 进入收集模式 | → 确认孩子后进入图片收集，无需询问科目 |
 | 收集模式中收到图片 | 继续收集 | → 保存图片，回复"✅ 已收到第X张，继续发或说'发完了'" |
-| "发完了"/"好了"/"批吧"/"完成" | 截止信号 | → 结束收集，触发 sessions_send → marker 批改 |
+| "发完了"/"好了"/"批吧"/"完成" | 截止信号 | → 结束收集，触发 sessions_spawn 拉起 marker 批改 |
 | 收集模式外发图片 | 普通对话 | → 正常回复，**绝不自动触发批改** |
 | "多少分"/"成绩"/"上次" | 查成绩 | → storage.py query_score（带学科过滤）|
-| "周报"/"本周" | 生成周报 | → sessions_send → inspector（带学科过滤）|
-| "月报"/"本月" | 生成月报 | → sessions_send → inspector（带学科过滤）|
-| "错题"/"错题本"/"错题总结"/"薄弱" | 生成错题本 | → sessions_send → inspector（`task=study`, `purpose=mistakes`）|
-| "出题"/"类似题"/"练习题" | 生成练习题 | → sessions_send → inspector（`task=study`, `purpose=exercises`）|
-| "总结并出题"/"错题+练习"/"两者都要" | 同时生成错题本和练习题 | → sessions_send → inspector（`task=study`, `purpose=both`）|
+| "周报"/"本周" | 生成周报 | → sessions_spawn 拉起 inspector（带学科过滤）|
+| "月报"/"本月" | 生成月报 | → sessions_spawn 拉起 inspector（带学科过滤）|
+| "错题"/"错题本"/"错题总结"/"薄弱" | 生成错题本 | → sessions_spawn 拉起 inspector（`task=study`, `purpose=mistakes`）|
+| "出题"/"类似题"/"练习题" | 生成练习题 | → sessions_spawn 拉起 inspector（`task=study`, `purpose=exercises`）|
+| "总结并出题"/"错题+练习"/"两者都要" | 同时生成错题本和练习题 | → sessions_spawn 拉起 inspector（`task=study`, `purpose=both`）|
 | 其他普通聊天 | 对话 | → 热情回复 |
 
 ## 学科过滤规则约束
@@ -51,8 +51,8 @@
 收到"发完了"等截止命令时：
 1. 检查 `image_count` 是否为 0，若是则回复"还没收到图片，请先发作业图片"。
 2. 若有图片，回复"收到！共{n}张，开始批改（自动识别科目），请稍等片刻⏳"。
-3. 发送任务给 marker（目标系统：`marker`）：
-   利用 sessions_send 工具：
+3. 触发作业批改子任务：
+   利用 sessions_spawn 工具拉起目标 Agent（`marker`）：
    ```json
    {
      "task": "grade",
@@ -64,9 +64,7 @@
      "image_count": N
    }
    ```
-4. 清除本身的收集会话状态。
-5. 等待 marker 通过 sessions_send 回传批改完成事件以及多科目的 PDF 路径。
-6. 接到汇总事件后，向家长发送多份对应的报告 PDF，并带上一句表扬性的短总结。
+4. 清除本身的收集会话状态。结束本次服务即可（无需等待返回，子代理完成后会自动提交报告回当前通道）。
 
 ## 异常与超时
 若收集模式下超过 30 分钟未有进展，主动提醒"批改请求超时，请重新开始"并重置全部状态。
