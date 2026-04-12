@@ -36,23 +36,26 @@
 ### 阶段一：开始收集
 用户说"帮我批作业"：
 1. 确认孩子。**不需要询问科目，系统支持多学科混发**
-2. 调用 `python3 scripts/storage.py gen_batch_id --student {name}` 生成 batch_id。
-3. 调用 `python3 scripts/storage.py init_batch --qq {qq} --student {name} --batch {bid}` 初始化批次图库。
-4. 记录本会话状态 `{collecting_mode: true, batch_id: bid, student: name, image_count: 0}`
+2. 调用 `uv run python scripts/storage.py gen_batch_id --student {name}` 生成 batch_id。
+3. 调用 `uv run python scripts/storage.py init_batch --qq {qq} --student {name} --batch {bid}` 初始化批次图库。
+4. 记录本会话状态 `{collecting_mode: true, batch_id: bid, student: name, image_count: 0, subject_counts: {}, unrecognized: []}`
 5. 回复："好的！请把小明的作业图片发过来，可以混发多个科目并无需标注，全部发完后说'发完了'📚"
 
-### 阶段二：持续收集图片
+### 阶段二：持续收集图片（含科目识别）
 收到图片且 `collecting_mode == true` 时：
-1. 将图片保存到 `data/{qq}/{name}/{bid}/original/img_{n}.jpg`
-2. `image_count += 1`
-3. 回复："✅ 已收到第{n}张，请继续发，全部发完说'发完了'"
+1. **用视觉能力快速判断图片科目**（数学/语文/英语）。只需判断科目类型，无需分析具体内容。
+2. 根据识别结果：
+   - **识别成功**：将图片保存到 `data/{qq}/{name}/{bid}/original/{科目}/img_{n}.jpg`，更新 `subject_counts[科目] += 1`
+   - **无法识别**（图片极度模糊、非作业内容等）：记录到 `unrecognized` 列表，并立即告知家长："⚠️ 第{n}张图片无法识别科目（可能太模糊或不是作业），请检查后重新发送这张"
+3. `image_count += 1`
+4. 回复："✅ 已收到第{n}张（{科目}），请继续发，全部发完说'发完了'"
 
-### 阶段三：截止与批改触发
+### 阶段三：截止与分科批改触发
 收到"发完了"等截止命令时：
 1. 检查 `image_count` 是否为 0，若是则回复"还没收到图片，请先发作业图片"。
-2. 若有图片，回复"收到！共{n}张，开始批改（自动识别科目），请稍等片刻⏳"。
-3. 触发作业批改子任务：
-   利用 sessions_spawn 工具拉起目标 Agent（`marker`）：
+2. 列出 `data/{qq}/{name}/{bid}/original/` 下的所有科目子文件夹，统计各科目图片数量。
+3. 回复："收到！共{n}张（数学X张、语文Y张...），开始分科批改，请稍等片刻⏳"
+4. **对每个科目子文件夹，各拉起一个独立的 marker**：
    ```json
    {
      "task": "grade",
@@ -60,11 +63,13 @@
      "student": "...",
      "grade": "...",
      "batch_id": "...",
-     "image_dir": "data/.../original/",
-     "image_count": N
+     "subject": "数学",
+     "image_dir": "data/.../original/数学/",
+     "image_count": X
    }
    ```
-4. 清除本身的收集会话状态。结束本次服务即可（无需等待返回，子代理完成后会自动提交报告回当前通道）。
+   每个科目一个 `sessions_spawn` 调用，marker 之间互相独立、并行执行。
+5. 清除本身的收集会话状态。结束本次服务即可（无需等待返回，各 marker 完成后会各自通过 announce 将报告发回 QQ 通道）。
 
 ## 异常与超时
 若收集模式下超过 30 分钟未有进展，主动提醒"批改请求超时，请重新开始"并重置全部状态。

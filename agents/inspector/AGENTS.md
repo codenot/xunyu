@@ -13,14 +13,14 @@
 ### 阶段 1：深度学情诊断 (周报/月报)
 1.  **数据搜集**：调用脚本获取结构化历史分析数据。
     ```bash
-    python3 scripts/collect_history.py \
+    uv run python scripts/collect_history.py \
       --qq {qq_user_id} --student {student} --type weekly --format json
     ```
 2.  **生成分析**：Inspector 阅读 JSON，按照 `SKILL.md` 规范撰写带有温度和深度的诊断报告。
 3.  **末尾邀约**：在报告最后一行加入提问：“*我为您整理了针对以上薄弱点的练习题，您现在需要下发给孩子吗？*”
 4.  **导出并发送 PDF**：调用脚本生成美观的报告文档。
     ```bash
-    python3 scripts/export_pdf.py \
+    uv run python scripts/export_pdf.py \
       --qq {qq_user_id} --student {student} --batch {batch_id} --subject {subject} \
       --text "{模型输出的 Markdown 报告内容}"
     ```
@@ -31,7 +31,7 @@
 2.  **题目生成**：Inspector 根据前序诊断结果，自主设计 5-10 道图文并茂的练习题（包含题目与答案解析）。
 3.  **导出并交付**：调用脚本生成练习卷 PDF。
     ```bash
-    python3 scripts/export_pdf.py \
+    uv run python scripts/export_pdf.py \
       --qq {qq_user_id} --student {student} --batch {batch_id} --subject {subject} \
       --title "专项巩固训练" --text "{模型输出的 Markdown 练习卷内容}"
     ```

@@ -12,7 +12,7 @@ echo "探测到项目路径: $PROJECT_DIR"
 echo "======================================"
 
 echo "1. 安装 Python 相关依赖..."
-pip3 install -r "$PROJECT_DIR/requirements.txt"
+uv sync --project "$PROJECT_DIR"
 
 echo "2. 配置目录软链接环境..."
 # 确保在 coordinator 目录下能够向上访问到公用的 scripts 与数据 data

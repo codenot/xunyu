@@ -121,6 +121,10 @@
         "volcengine-plan/kimi-k2.5": {}
       },
       "workspace": "/home/ubuntu/.openclaw/workspace",
+      "timeoutSeconds": 1800,
+      "subagents": {
+        "runTimeoutSeconds": 1800
+      },
       "compaction": {
         "mode": "safeguard"
       }
